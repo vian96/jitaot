@@ -6,6 +6,7 @@ using namespace Compiler::IR;
 
 int main() {
     // Construct factorial function (input > 1)
+    // based on working LLVM IR in fact.ll
     BasicBlock entry, loop, ret;
     [[maybe_unused]] Graph graph{&entry};
 
