@@ -1,6 +1,7 @@
 #include "basic_block.hpp"
 #include "instruction.hpp"
 #include "graph.hpp"
+#include "types.hpp"
 
 using namespace Compiler::IR;
 
@@ -8,12 +9,10 @@ int main() {
     // Construct factorial function (input > 1)
     // based on working LLVM IR in fact.ll
     BasicBlock entry, loop, ret;
-    [[maybe_unused]] Graph graph{&entry};
+    [[maybe_unused]] Graph graph{&entry, {Types::INT64_T}};
 
-    Input tmpinp{5};
-    auto n = entry.add_<Const>({tmpinp});
-    tmpinp.data = 1;
-    auto int1 = entry.add_<Const>({tmpinp});
+    auto n = entry.add_<GetArg>({Input(0)});
+    auto int1 = entry.add_<Const>({Input(1)});
     entry.next1 = &loop;
 
     loop.preds.push_back(&entry);
@@ -38,6 +37,7 @@ int main() {
     ret.preds.push_back(&loop);
     ret.add_<Ret>({mul});
 
+    graph.dump();
     entry.dump();
     loop.dump();
     ret.dump();

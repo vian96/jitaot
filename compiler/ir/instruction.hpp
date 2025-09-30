@@ -33,6 +33,7 @@ typedef InstructionTraits<'SUB', Types::INT64_T> Sub;
 typedef InstructionTraits<'MUL', Types::INT64_T> Mul;
 typedef InstructionTraits<'RET', Types::VOID_T> Ret;
 typedef InstructionTraits<'CNST', Types::INT64_T> Const;
+typedef InstructionTraits<'ARG', Types::INT64_T> GetArg;
 
 struct User {
     Instruction *inst;
