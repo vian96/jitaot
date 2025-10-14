@@ -1,10 +1,11 @@
 #ifndef COMPILER_IR_GRAPH
 #define COMPILER_IR_GRAPH
 
-#include <vector>
 #include <iostream>
-#include "types.hpp"
+#include <vector>
+
 #include "basic_block.hpp"
+#include "types.hpp"
 
 namespace Compiler {
 namespace IR {
@@ -15,17 +16,19 @@ struct Graph {
     inline static int counter = 0;
 
     const int id;
-    BasicBlock *first;
     std::vector<Types::Type> args;
+    std::vector<BasicBlock> basic_blocks;
+    BasicBlock *first = nullptr;
 
-    Graph(BasicBlock *first_, std::vector<Types::Type> args_)
-        : id(counter++), first(first_), args(args_) {}
+    Graph(int bbnum = 1, std::vector<Types::Type> args_ = {})
+        : id(counter++), args(args_), basic_blocks(bbnum), first(&basic_blocks[0]) {
+        for (size_t i = 0; i < basic_blocks.size(); i++) basic_blocks[i].id = i;
+    }
 
     void dump() {
         std::cout << "Method %" << id << " args' types: ";
-        for (auto &i:args) std::cout << i << ' ';
-        if (first)
-            std::cout << ", uses bb %" << first->id;
+        for (auto &i : args) std::cout << i << ' ';
+        if (first) std::cout << ", uses bb %" << first->id;
         std::cout << "\n";
     }
 };

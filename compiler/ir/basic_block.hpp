@@ -14,8 +14,7 @@ namespace IR {
 struct Graph;
 
 struct BasicBlock {
-    inline static std::atomic<int> counter = 0;
-    const int id;
+    int id;  // per method counter
 
     Instruction *first_phi = nullptr;
     Instruction *first_not_phi = nullptr;
@@ -28,7 +27,19 @@ struct BasicBlock {
 
     Graph *graph;
 
-    BasicBlock() : id(counter++) {}
+    BasicBlock *idom = nullptr;
+    int post_order_number = -1;
+
+    BasicBlock() {}
+
+    void add_next1(BasicBlock *other) {
+        next1 = other;
+        other->preds.push_back(this);
+    }
+    void add_next2(BasicBlock *other) {
+        next2 = other;
+        other->preds.push_back(this);
+    }
 
     Instruction *add_instruction(opcode_t opcode, Types::Type type,
                                  std::vector<Input> inputs,
@@ -67,6 +78,8 @@ struct BasicBlock {
         if (next2) std::cout << "next2: " << next2->id << ' ';
         std::cout << "\npreds:";
         for (auto &i : preds) std::cout << " %" << i->id;
+        if (idom) std::cout << "\nidom: " << idom->id;
+        else std::cout << "\nno idom:(";
         std::cout << "\n\n\n";
     }
 };
