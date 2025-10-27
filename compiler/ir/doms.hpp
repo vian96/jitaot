@@ -1,3 +1,6 @@
+#ifndef COMPILER_IR_DOMS_HPP
+#define COMPILER_IR_DOMS_HPP
+
 #include <algorithm>
 #include <cassert>
 #include <vector>
@@ -155,3 +158,4 @@ struct DominatorTree {
 
 }  // namespace IR
 }  // namespace Compiler
+#endif  // COMPILER_IR_DOMS_HPP

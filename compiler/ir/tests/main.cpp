@@ -5,6 +5,7 @@
 #include "graph.hpp"
 #include "instruction.hpp"
 #include "types.hpp"
+#include "loop_analyser.hpp"
 
 using namespace Compiler::IR;
 
@@ -217,6 +218,114 @@ bool test_dom_tree3() {
     return actual_tree.is_equal(expected_tree);
 }
 
+void test_loop_analyzer1() {
+    std::cout << "\n--- Loop Analyzer Test 1 ---\n";
+    Graph graph{7};  // copy-paste fro test_domtree1
+    BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
+               &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
+               &E = graph.basic_blocks[4], &F = graph.basic_blocks[5],
+               &G = graph.basic_blocks[6];
+    A.add_next1(&B);
+    B.add_next1(&C);
+    B.add_next2(&F);
+    C.add_next1(&D);
+    F.add_next1(&E);
+    F.add_next2(&G);
+    E.add_next1(&D);
+    G.add_next1(&D);
+
+    LoopAnalyzer la(&graph);
+    la.dump();
+}
+
+void test_loop_analyzer2() {
+    std::cout << "\n--- Loop Analyzer Test 2 ---\n";
+    Graph graph{11};  // copy-paste fro test_domtree2
+    BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
+               &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
+               &E = graph.basic_blocks[4], &F = graph.basic_blocks[5],
+               &G = graph.basic_blocks[6], &H = graph.basic_blocks[7],
+               &I = graph.basic_blocks[8], &J = graph.basic_blocks[9],
+               &K = graph.basic_blocks[10];
+
+    A.add_next1(&B);
+    B.add_next1(&C);
+    B.add_next2(&J);
+    C.add_next1(&D);
+    D.add_next1(&E);
+    D.add_next2(&C);
+    E.add_next1(&F);
+    F.add_next1(&G);
+    F.add_next2(&E);
+    G.add_next1(&I);
+    G.add_next2(&H);
+    H.add_next1(&B);
+    I.add_next1(&K);
+    J.add_next1(&C);
+
+    LoopAnalyzer la(&graph);
+    la.dump();
+}
+
+void test_loop_analyzer3() {
+    std::cout << "\n--- Loop Analyzer Test 3 ---\n";
+    Graph graph{5};  // A-E
+    BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
+               &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
+               &E = graph.basic_blocks[4];
+    A.add_next1(&B);
+    B.add_next1(&C);
+    B.add_next2(&D);
+    D.add_next1(&E);
+    E.add_next1(&B);
+
+    LoopAnalyzer la(&graph);
+    la.dump();
+}
+
+void test_loop_analyzer4() {
+    std::cout << "\n--- Loop Analyzer Test 4 ---\n";
+    Graph graph{6};  // A-F
+    BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
+               &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
+               &E = graph.basic_blocks[4], &F = graph.basic_blocks[5];
+
+    A.add_next1(&B);
+    B.add_next1(&C);
+    C.add_next2(&D);
+    C.add_next1(&F);
+    D.add_next1(&E);
+    D.add_next2(&F);
+    E.add_next1(&B);
+
+    LoopAnalyzer la(&graph);
+    la.dump();
+}
+
+void test_loop_analyzer5() {
+    std::cout << "\n--- Loop Analyzer Test 5 ---\n";
+    Graph graph{8};  // A-H
+    BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
+               &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
+               &E = graph.basic_blocks[4], &F = graph.basic_blocks[5],
+               &G = graph.basic_blocks[6], &H = graph.basic_blocks[7];
+
+    A.add_next1(&B);
+    B.add_next1(&C);
+    B.add_next2(&D);
+    C.add_next1(&E);
+    C.add_next2(&F);
+    D.add_next1(&F);
+    F.add_next1(&G);
+    G.add_next1(&B);
+    G.add_next2(&H);
+    H.add_next1(&A);
+
+    LoopAnalyzer la(&graph);
+    la.dump();
+}
+
+
 int main() {
     test_construct(true);
     if (!test_dom_tree1()) {
@@ -231,5 +340,11 @@ int main() {
         std::cout << "test domtree3 FAILED :(\n";
         return 1;
     }
-    std::cout << "all tests passed!\n";
+    std::cout << "all domtree tests passed!\n";
+
+    test_loop_analyzer1();
+    test_loop_analyzer2();
+    test_loop_analyzer3();
+    test_loop_analyzer4();
+    test_loop_analyzer5();
 }
