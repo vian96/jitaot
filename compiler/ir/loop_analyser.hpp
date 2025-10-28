@@ -26,6 +26,8 @@ struct LoopAnalyzer {
     std::vector<std::pair<BasicBlock *, BasicBlock *>> back_edges;
     std::vector<Loop> loops;
 
+    LoopAnalyzer() : graph(nullptr) {}  // for tests
+
     explicit LoopAnalyzer(Graph *g) : graph(g) {
         if (!graph || !graph->first) return;
         DominatorTree dom_tree(*g);
@@ -72,6 +74,102 @@ struct LoopAnalyzer {
         }
     }
 
+    bool is_equal(const LoopAnalyzer &other, bool dump_info = false) const {
+        if (loops.size() != other.loops.size()) {
+            if (dump_info)
+                std::cerr << "different number of loops: expected: " << other.loops.size()
+                          << ", got: " << loops.size() << "\n";
+            return false;
+        }
+
+        std::unordered_map<BasicBlock *, const Loop *> this_loop_map;
+        const Loop *this_root = nullptr;
+        for (const auto &loop : loops)
+            if (loop.header)
+                this_loop_map[loop.header] = &loop;
+            else
+                this_root = &loop;
+
+        std::unordered_map<BasicBlock *, const Loop *> other_loop_map;
+        const Loop *other_root = nullptr;
+        for (const auto &loop : other.loops)
+            if (loop.header)
+                other_loop_map[loop.header] = &loop;
+            else
+                other_root = &loop;
+
+        if (this_loop_map.size() != other_loop_map.size() ||
+            (this_root == nullptr) != (other_root == nullptr)) {
+            if (dump_info) std::cerr << "mismatch in number of regular/root loops\n";
+            return false;
+        }
+
+        // compare contents of containers as sets with dump info if needed
+        auto compare_block_sets = [&](const auto &container1, const auto &container2,
+                                      const char *name, BasicBlock *header) {
+            std::unordered_set<BasicBlock *> set1(container1.begin(), container1.end());
+            std::unordered_set<BasicBlock *> set2(container2.begin(), container2.end());
+            if (set1 != set2) {
+                if (dump_info)
+                    std::cerr << "mismatch in content of " << name
+                              << " for loop with header "
+                              << (header ? std::to_string(header->id) : "ROOT") << "\n";
+                return false;
+            }
+            return true;
+        };
+
+        for (auto const &[header, this_loop] : this_loop_map) {
+            auto it = other_loop_map.find(header);
+            if (it == other_loop_map.end()) {
+                if (dump_info)
+                    std::cerr << "Error: Loop with header " << header->id
+                              << " not found in other.\n";
+                return false;
+            }
+            const Loop *other_loop = it->second;
+
+            if (!compare_block_sets(this_loop->blocks, other_loop->blocks, "blocks",
+                                    header))
+                return false;
+            if (!compare_block_sets(this_loop->latches, other_loop->latches, "latches",
+                                    header))
+                return false;
+
+            BasicBlock *this_parent_header =
+                this_loop->parent_loop ? this_loop->parent_loop->header : nullptr;
+            BasicBlock *other_parent_header =
+                other_loop->parent_loop ? other_loop->parent_loop->header : nullptr;
+            if (this_parent_header != other_parent_header) {
+                if (dump_info)
+                    std::cerr << "Error: Parent loop mismatch for loop with header "
+                              << header->id << "\n";
+                return false;
+            }
+        }
+
+        if (this_root) {
+            if (!compare_block_sets(this_root->blocks, other_root->blocks, "blocks",
+                                    nullptr))
+                return false;
+
+            std::unordered_set<BasicBlock *> this_inner_headers;
+            for (const auto *inner : this_root->inner_loops)
+                this_inner_headers.insert(inner->header);
+
+            std::unordered_set<BasicBlock *> other_inner_headers;
+            for (const auto *inner : other_root->inner_loops)
+                other_inner_headers.insert(inner->header);
+
+            if (this_inner_headers != other_inner_headers) {
+                if (dump_info) std::cerr << "Error: Root loop inner loops mismatch.\n";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
    private:
     void collect_back_edges(const DominatorTree &dom_tree) {
         std::vector<bool> visited(graph->basic_blocks.size(), false);
@@ -106,7 +204,7 @@ struct LoopAnalyzer {
         std::unordered_map<BasicBlock *, Loop *> header_to_loop;
         // FIXME: overkill, there may be much more latches than loops
         // but it is better than realloc with pointer loss
-        loops.reserve(back_edges.size() + 1); // +1 for root
+        loops.reserve(back_edges.size() + 1);  // +1 for root
 
         for (auto &edge : back_edges) {
             BasicBlock *latch = edge.first;
@@ -194,8 +292,6 @@ struct LoopAnalyzer {
 
         for (auto &loop : loops)
             if (!loop.parent_loop && &loop != &root_loop) {
-                std::cout << "loop with header %" << char('A' + loop.header->id)
-                          << "link to root\n";
                 loop.parent_loop = &root_loop;
                 root_loop.inner_loops.push_back(&loop);
             }

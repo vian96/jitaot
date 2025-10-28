@@ -4,8 +4,8 @@
 #include "doms.hpp"
 #include "graph.hpp"
 #include "instruction.hpp"
-#include "types.hpp"
 #include "loop_analyser.hpp"
+#include "types.hpp"
 
 using namespace Compiler::IR;
 
@@ -218,8 +218,7 @@ bool test_dom_tree3() {
     return actual_tree.is_equal(expected_tree);
 }
 
-void test_loop_analyzer1() {
-    std::cout << "\n--- Loop Analyzer Test 1 ---\n";
+bool test_loop_analyzer1() {
     Graph graph{7};  // copy-paste fro test_domtree1
     BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
                &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
@@ -235,11 +234,17 @@ void test_loop_analyzer1() {
     G.add_next1(&D);
 
     LoopAnalyzer la(&graph);
-    la.dump();
+    LoopAnalyzer expected_la;
+    // only root loop with all nodes in it
+    expected_la.loops.emplace_back();
+    Loop &root_loop = expected_la.loops.back();
+    root_loop.header = nullptr;
+    root_loop.blocks = {&A, &B, &C, &D, &E, &F, &G};
+
+    return la.is_equal(expected_la, true);
 }
 
-void test_loop_analyzer2() {
-    std::cout << "\n--- Loop Analyzer Test 2 ---\n";
+bool test_loop_analyzer2() {
     Graph graph{11};  // copy-paste fro test_domtree2
     BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
                &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
@@ -264,11 +269,39 @@ void test_loop_analyzer2() {
     J.add_next1(&C);
 
     LoopAnalyzer la(&graph);
-    la.dump();
+    LoopAnalyzer expected_la;
+    expected_la.loops.resize(4);
+
+    Loop &root = expected_la.loops[0];
+    Loop &l_B = expected_la.loops[1];
+    Loop &l_C = expected_la.loops[2];
+    Loop &l_E = expected_la.loops[3];
+
+    root.header = nullptr;
+    root.blocks = {&A, &I, &K};
+    root.parent_loop = nullptr;
+    root.inner_loops = {&l_B};
+
+    l_B.header = &B;
+    l_B.blocks = {&B, &G, &H, &J};
+    l_B.latches = {&H};
+    l_B.parent_loop = &root;
+    l_B.inner_loops = {&l_C, &l_E};
+
+    l_C.header = &C;
+    l_C.blocks = {&C, &D};
+    l_C.latches = {&D};
+    l_C.parent_loop = &l_B;
+
+    l_E.header = &E;
+    l_E.blocks = {&E, &F};
+    l_E.latches = {&F};
+    l_E.parent_loop = &l_B;
+
+    return la.is_equal(expected_la, true);
 }
 
-void test_loop_analyzer3() {
-    std::cout << "\n--- Loop Analyzer Test 3 ---\n";
+bool test_loop_analyzer3() {
     Graph graph{5};  // A-E
     BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
                &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
@@ -280,11 +313,24 @@ void test_loop_analyzer3() {
     E.add_next1(&B);
 
     LoopAnalyzer la(&graph);
-    la.dump();
+    LoopAnalyzer expected_la;
+    expected_la.loops.resize(2);
+    Loop &root = expected_la.loops[0];
+    Loop &l_B = expected_la.loops[1];
+
+    root.header = nullptr;
+    root.blocks = {&A, &C};
+    root.inner_loops = {&l_B};
+
+    l_B.header = &B;
+    l_B.blocks = {&B, &D, &E};
+    l_B.latches = {&E};
+    l_B.parent_loop = &root;
+
+    return la.is_equal(expected_la, true);
 }
 
-void test_loop_analyzer4() {
-    std::cout << "\n--- Loop Analyzer Test 4 ---\n";
+bool test_loop_analyzer4() {
     Graph graph{6};  // A-F
     BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
                &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
@@ -299,11 +345,24 @@ void test_loop_analyzer4() {
     E.add_next1(&B);
 
     LoopAnalyzer la(&graph);
-    la.dump();
+    LoopAnalyzer expected_la;
+    expected_la.loops.resize(2);
+    Loop &root = expected_la.loops[0];
+    Loop &l_B = expected_la.loops[1];
+
+    root.header = nullptr;
+    root.blocks = {&A, &F};
+    root.inner_loops = {&l_B};
+
+    l_B.header = &B;
+    l_B.blocks = {&B, &C, &D, &E};
+    l_B.latches = {&E};
+    l_B.parent_loop = &root;
+
+    return la.is_equal(expected_la, true);
 }
 
-void test_loop_analyzer5() {
-    std::cout << "\n--- Loop Analyzer Test 5 ---\n";
+bool test_loop_analyzer5() {
     Graph graph{8};  // A-H
     BasicBlock &A = graph.basic_blocks[0], &B = graph.basic_blocks[1],
                &C = graph.basic_blocks[2], &D = graph.basic_blocks[3],
@@ -322,9 +381,29 @@ void test_loop_analyzer5() {
     H.add_next1(&A);
 
     LoopAnalyzer la(&graph);
-    la.dump();
-}
+    LoopAnalyzer expected_la;
+    expected_la.loops.resize(3);
+    Loop &root = expected_la.loops[0];
+    Loop &l_A = expected_la.loops[1];
+    Loop &l_B = expected_la.loops[2];
 
+    root.header = nullptr;
+    root.blocks = {&E};
+    root.inner_loops = {&l_A};
+
+    l_A.header = &A;
+    l_A.blocks = {&A, &H};
+    l_A.latches = {&H};
+    l_A.parent_loop = &root;
+    l_A.inner_loops = {&l_B};
+
+    l_B.header = &B;
+    l_B.blocks = {&B, &C, &D, &F, &G};
+    l_B.latches = {&G};
+    l_B.parent_loop = &l_A;
+
+    return la.is_equal(expected_la, true);
+}
 
 int main() {
     test_construct(true);
@@ -342,9 +421,25 @@ int main() {
     }
     std::cout << "all domtree tests passed!\n";
 
-    test_loop_analyzer1();
-    test_loop_analyzer2();
-    test_loop_analyzer3();
-    test_loop_analyzer4();
-    test_loop_analyzer5();
+    if (!test_loop_analyzer1()) {
+        std::cout << "test loop_analyzer1 FAILED :(\n";
+        return 1;
+    }
+    if (!test_loop_analyzer2()) {
+        std::cout << "test loop_analyzer2 FAILED :(\n";
+        return 1;
+    }
+    if (!test_loop_analyzer3()) {
+        std::cout << "test loop_analyzer3 FAILED :(\n";
+        return 1;
+    }
+    if (!test_loop_analyzer4()) {
+        std::cout << "test loop_analyzer4 FAILED :(\n";
+        return 1;
+    }
+    if (!test_loop_analyzer5()) {
+        std::cout << "test loop_analyzer5 FAILED :(\n";
+        return 1;
+    }
+    std::cout << "all loop_analyzer tests passed!\n";
 }
