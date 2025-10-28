@@ -32,40 +32,41 @@ struct LoopAnalyzer {
         collect_back_edges(dom_tree);
         populate_loops();
         build_loop_tree();
+        adjust_loop_tree();  // remove bbs from inner loops + add root loop
     }
 
-    void dump() {
+    void dump() const {
         std::cout << "Loops:\n";
         for (size_t i = 0; i < loops.size(); ++i) {
             std::cout << "Loop " << i << ":\n";
-            std::cout << "  Header: %" << char('A'+loops[i].header->id) << "\n";
+            if (loops[i].header)
+                std::cout << "  Header: %" << char('A' + loops[i].header->id) << "\n";
+            else
+                std::cout << "  Header: null (Root Loop)\n";
+
             std::cout << "  Blocks: ";
-            for (auto &block : loops[i].blocks) {
-                std::cout << "%" << char('A'+block->id) << " ";
-            }
+            for (auto &block : loops[i].blocks)
+                std::cout << "%" << char('A' + block->id) << " ";
+
             std::cout << "\n";
             std::cout << "  Latches: ";
-            for (auto &latch : loops[i].latches) {
-                std::cout << "%" << char('A'+latch->id) << " ";
-            }
+            for (auto &latch : loops[i].latches)
+                std::cout << "%" << char('A' + latch->id) << " ";
             std::cout << "\n";
             if (loops[i].parent_loop) {
                 auto it = std::find_if(
                     loops.begin(), loops.end(),
                     [this, i](const Loop &l) { return &l == loops[i].parent_loop; });
-                if (it != loops.end()) {
+                if (it != loops.end())
                     std::cout << "  Parent Loop: " << std::distance(loops.begin(), it)
                               << "\n";
-                }
             }
             std::cout << "  Inner Loops: ";
             for (auto &inner : loops[i].inner_loops) {
-                auto it = std::find_if(
-                    loops.begin(), loops.end(),
-                    [inner](const Loop &l) { return &l == inner; });
-                if (it != loops.end()) {
+                auto it = std::find_if(loops.begin(), loops.end(),
+                                       [inner](const Loop &l) { return &l == inner; });
+                if (it != loops.end())
                     std::cout << std::distance(loops.begin(), it) << " ";
-                }
             }
             std::cout << "\n";
         }
@@ -79,8 +80,7 @@ struct LoopAnalyzer {
     }
 
     void dfs_back_edges(BasicBlock *u, std::vector<bool> &visited,
-                          std::vector<bool> &gray_markers,
-                          const DominatorTree &dom_tree) {
+                        std::vector<bool> &gray_markers, const DominatorTree &dom_tree) {
         // checks if u is a latch node
         // i.e. if any of its successors is header
         // i.e. if any of its successors dominates u
@@ -104,6 +104,9 @@ struct LoopAnalyzer {
 
     void populate_loops() {
         std::unordered_map<BasicBlock *, Loop *> header_to_loop;
+        // FIXME: overkill, there may be much more latches than loops
+        // but it is better than realloc with pointer loss
+        loops.reserve(back_edges.size() + 1); // +1 for root
 
         for (auto &edge : back_edges) {
             BasicBlock *latch = edge.first;
@@ -152,18 +155,50 @@ struct LoopAnalyzer {
                 if (i == j) continue;
                 if (loops[j].blocks.count(loops[i].header)) {
                     // if found i's header inside j's blocks, need to link loops
-                    if (!loops[i].parent_loop
-                        || loops[i].parent_loop->blocks.size() > loops[j].blocks.size() // check to get immediate parent in loop tree
-                    )
+                    // second check is to get immediate parent in loop tree
+                    if (!loops[i].parent_loop ||
+                        loops[i].parent_loop->blocks.size() > loops[j].blocks.size())
                         loops[i].parent_loop = &loops[j];
                 }
             }
         }
 
-        // set child's corresponding to set parents
+        // set childs corresponding to already set parents
         for (size_t i = 0; i < loops.size(); ++i)
             if (loops[i].parent_loop)
                 loops[i].parent_loop->inner_loops.push_back(&loops[i]);
+    }
+
+    void adjust_loop_tree() {
+        // remove blocks from inner loops
+        for (auto &loop : loops) {
+            for (auto *inner_loop : loop.inner_loops) {
+                for (auto *block_in_inner : inner_loop->blocks) {
+                    loop.blocks.erase(block_in_inner);
+                }
+            }
+        }
+
+        // create root loop
+        loops.emplace_back();
+        Loop &root_loop = loops.back();
+        root_loop.header = nullptr;
+
+        std::unordered_set<BasicBlock *> blocks_in_any_loop;
+        for (const auto &loop : loops)
+            blocks_in_any_loop.insert(loop.blocks.begin(), loop.blocks.end());
+
+        for (auto &bb : graph->basic_blocks)
+            if (blocks_in_any_loop.find(&bb) == blocks_in_any_loop.end())
+                root_loop.blocks.insert(&bb);
+
+        for (auto &loop : loops)
+            if (!loop.parent_loop && &loop != &root_loop) {
+                std::cout << "loop with header %" << char('A' + loop.header->id)
+                          << "link to root\n";
+                loop.parent_loop = &root_loop;
+                root_loop.inner_loops.push_back(&loop);
+            }
     }
 };
 
