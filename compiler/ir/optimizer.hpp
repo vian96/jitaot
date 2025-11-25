@@ -15,34 +15,48 @@ namespace IR {
 
 class Optimizer {
    public:
-    static void constant_folding(Graph* graph) {
-        if (!graph || !graph->first) return;
+    static bool constant_folding(Graph* graph) {
+        if (!graph || !graph->first) return false;
 
         std::vector<BasicBlock*> rpo = get_reverse_post_order(graph);
 
+        bool changed = false;
         for (BasicBlock* bb : rpo) {
             Instruction* inst = bb->first_phi ? bb->first_phi : bb->first_not_phi;
             while (inst) {
                 Instruction* next = inst->next;  // so inst change does not affect next
-                try_fold_instruction(inst);
+                changed |= try_fold_instruction(inst);
                 inst = next;
             }
         }
+        return changed;
     }
 
-    static void peephole_pass(Graph* graph) {
-        if (!graph || !graph->first) return;
+    static bool peephole_pass(Graph* graph) {
+        if (!graph || !graph->first) return false;
 
         // TODO: make cached?
         std::vector<BasicBlock*> rpo = get_reverse_post_order(graph);
 
+        bool changed = false;
         for (BasicBlock* bb : rpo) {
             Instruction* inst = bb->first_phi ? bb->first_phi : bb->first_not_phi;
             while (inst) {
                 Instruction* next = inst->next;
-                try_peephole_instruction(inst);
+                changed |= try_peephole_instruction(inst);
                 inst = next;
             }
+        }
+        return changed;
+    }
+
+    static void optimize(Graph* graph) {
+        bool change = true;
+        while (change) {
+            change = peephole_pass(graph);
+            std::cout << change << '\n';
+            change |= constant_folding(graph);
+            std::cout << change << '\n';
         }
     }
 
@@ -60,12 +74,12 @@ class Optimizer {
         return std::nullopt;
     }
 
-    static void try_fold_instruction(Instruction* inst) {
-        if (inst->opcode == Const::opcode) return;
+    static bool try_fold_instruction(Instruction* inst) {
+        if (inst->opcode == Const::opcode) return false;
 
         if (inst->opcode != Sub::opcode && inst->opcode != And::opcode &&
             inst->opcode != Shr::opcode)
-            return;
+            return false;
 
         if (inst->inputs.size() != 2) throw "ill-formed sub, shr or and: not 2 args";
 
@@ -92,7 +106,9 @@ class Optimizer {
             }
 
             replace_instruction_with_const(inst, result);
+            return true;
         }
+        return false;
     }
 
     static void replace_instruction_with_const(Instruction* inst, int64_t val) {
@@ -161,59 +177,64 @@ class Optimizer {
         return false;
     }
 
-    static void try_peephole_instruction(Instruction* inst) {
-        if (inst->inputs.size() != 2) return;
+    static bool try_peephole_instruction(Instruction* inst) {
+        if (inst->inputs.size() != 2) return false;
+
+        auto val1 = get_constant_value(inst->inputs[0]);
+        auto val2 = get_constant_value(inst->inputs[1]);
 
         if (inst->opcode == Sub::opcode) {
             auto val2 = get_constant_value(inst->inputs[1]);
             if (val2 && *val2 == 0) {
                 replace_instruction_with_input(inst, inst->inputs[0]);
-                return;
+                return true;
             }
 
             if (inputs_are_equal(inst->inputs[0], inst->inputs[1])) {
                 replace_instruction_with_const(inst, 0);
-                return;
+                return true;
             }
         }
 
         if (inst->opcode == And::opcode) {
             if (inputs_are_equal(inst->inputs[0], inst->inputs[1])) {
                 replace_instruction_with_input(inst, inst->inputs[0]);
-                return;
+                return true;
             }
-
-            auto val1 = get_constant_value(inst->inputs[0]);
-            auto val2 = get_constant_value(inst->inputs[1]);
 
             if ((val1 && *val1 == 0) || (val2 && *val2 == 0)) {
                 replace_instruction_with_const(inst, 0);
-                return;
+                return true;
             }
 
             if (val2 && *val2 == -1) {
                 replace_instruction_with_input(inst, inst->inputs[0]);
-                return;
+                return true;
             }
             if (val1 && *val1 == -1) {
                 replace_instruction_with_input(inst, inst->inputs[1]);
-                return;
+                return true;
             }
         }
 
         if (inst->opcode == Shr::opcode) {
             auto val2 = get_constant_value(inst->inputs[1]);
 
+            if (val1 && *val1 == 0) {
+                replace_instruction_with_const(inst, 0);
+                return true;
+            }
             if (val2 && *val2 == 0) {
                 replace_instruction_with_input(inst, inst->inputs[0]);
-                return;
+                return true;
             }
 
             if (val2 && *val2 >= 64) {
                 replace_instruction_with_const(inst, 0);
-                return;
+                return true;
             }
         }
+        return false;
     }
 };
 

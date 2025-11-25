@@ -568,6 +568,70 @@ bool test_peepholes() {
     return true;
 }
 
+bool test_peephole_swapped_args() {
+    Graph graph{1};
+    BasicBlock &bb = graph.basic_blocks[0];
+
+    auto arg0 = bb.add_<Arg64>({Input(0)});
+    auto c0 = bb.add_<Const64>({Input(0)});
+    auto c_minus_1 = bb.add_<Const64>({Input(-1)});
+
+    auto and_zero_first = bb.add_<And64>({Input(c0), Input(arg0)});
+    auto and_minus_1_first = bb.add_<And64>({Input(c_minus_1), Input(arg0)});
+    auto shr_zero_first = bb.add_<Shr64>({Input(c0), Input(arg0)});
+
+    auto check1 = bb.add_<Sub64>({Input(and_zero_first), Input(1)});
+    auto check2 = bb.add_<Sub64>({Input(and_minus_1_first), Input(1)});
+    auto check3 = bb.add_<Sub64>({Input(shr_zero_first), Input(1)});
+
+    Optimizer::peephole_pass(&graph);
+
+    if (and_zero_first->opcode != Const::opcode ||
+        std::get<int>(and_zero_first->inputs[0].data) != 0) {
+        std::cout << "Failed: and 0, x -> 0\n";
+        return false;
+    }
+
+    if (!std::holds_alternative<Instruction *>(check2->inputs[0].data) ||
+        std::get<Instruction *>(check2->inputs[0].data) != arg0) {
+        std::cout << "Failed: and -1, x -> x\n";
+        return false;
+    }
+
+    if (shr_zero_first->opcode != Const::opcode ||
+        std::get<int>(shr_zero_first->inputs[0].data) != 0) {
+        std::cout << "Failed: shr 0, x -> 0\n";
+        return false;
+    }
+
+    return true;
+}
+
+bool test_peephole_and_fold() {
+    Graph graph{1};
+    BasicBlock &bb = graph.basic_blocks[0];
+
+    // 10-(x-x)
+    auto arg0 = bb.add_<Arg64>({Input(0)});
+    auto p1 = bb.add_<Sub64>({Input(arg0), Input(arg0)});
+    auto c10 = bb.add_<Const64>({Input(10)});
+    auto f1 = bb.add_<Sub64>({Input(c10), Input(p1)});
+    auto ret = bb.add_<RetVoid>({f1});
+
+    Optimizer::optimize(&graph);
+    graph.dump();
+    bb.dump();
+
+    if (p1->opcode != Const::opcode || std::get<int>(p1->inputs[0].data) != 0)
+        return false;
+
+    auto out = std::get<Instruction *>(ret->inputs[0].data);
+    if (out->opcode != Const::opcode || std::get<int>(out->inputs[0].data) != 10)
+        return false;
+
+    return true;
+}
+
 int main() {
     test_construct(true);
     if (!test_dom_tree1()) {
@@ -626,6 +690,14 @@ int main() {
 
     if (!test_peepholes()) {
         std::cout << "test_peepholes FAILED :(\n";
+        return 1;
+    }
+    if (!test_peephole_swapped_args()) {
+        std::cout << "test_peephole_swapped_args FAILED :(\n";
+        return 1;
+    }
+    if (!test_peephole_and_fold()) {
+        std::cout << "test_peephole_and_fold FAILED :(\n";
         return 1;
     }
     std::cout << "peephole tests passed!\n";
