@@ -506,6 +506,68 @@ bool test_constant_folding_negative() {
     return true;
 }
 
+bool test_peepholes() {
+    Graph graph{1};
+    BasicBlock &bb = graph.basic_blocks[0];
+
+    auto c0 = bb.add_<Const64>({Input(0)});
+    auto c_minus_1 = bb.add_<Const64>({Input(-1)});
+    auto arg0 = bb.add_<Arg64>({Input(0)});  // x: argument of function
+
+    // sub x, 0 -> x
+    auto sub_zero = bb.add_<Sub64>({Input(arg0), Input(0)});
+    // sub x, x -> 0
+    auto sub_self = bb.add_<Sub64>({Input(arg0), Input(arg0)});
+
+    // and x, 0 -> 0
+    auto and_zero = bb.add_<And64>({Input(arg0), Input(c0)});
+    // and x, -1 -> x
+    auto and_minus_1 = bb.add_<And64>({Input(arg0), Input(c_minus_1)});
+    // and x, x -> x
+    auto and_self = bb.add_<And64>({Input(arg0), Input(arg0)});
+
+    // shr x, 0 -> x
+    auto shr_zero = bb.add_<Shr64>({Input(arg0), Input(c0)});
+    // shr x, 70 -> 0
+    auto shr_huge = bb.add_<Shr64>({Input(arg0), Input(70)});
+
+    // need users of optimizable-to-other-inst instructions to see if they were actually
+    // optimized since optimizer only changes users, not the instruction itself
+    auto check_sub_zero = bb.add_<Sub64>({Input(sub_zero), Input(1)});
+    auto check_and_minus_1 = bb.add_<Sub64>({Input(and_minus_1), Input(1)});
+    auto check_and_self = bb.add_<Sub64>({Input(and_self), Input(1)});
+    auto check_shr_zero = bb.add_<Sub64>({Input(shr_zero), Input(1)});
+
+    Optimizer::peephole_pass(&graph);
+
+    if (!std::holds_alternative<Instruction *>(check_sub_zero->inputs[0].data) ||
+        std::get<Instruction *>(check_sub_zero->inputs[0].data) != arg0)
+        return false;
+
+    if (sub_self->opcode != Const::opcode || std::get<int>(sub_self->inputs[0].data) != 0)
+        return false;
+
+    if (and_zero->opcode != Const::opcode || std::get<int>(and_zero->inputs[0].data) != 0)
+        return false;
+
+    if (!std::holds_alternative<Instruction *>(check_and_minus_1->inputs[0].data) ||
+        std::get<Instruction *>(check_and_minus_1->inputs[0].data) != arg0)
+        return false;
+
+    if (!std::holds_alternative<Instruction *>(check_and_self->inputs[0].data) ||
+        std::get<Instruction *>(check_and_self->inputs[0].data) != arg0)
+        return false;
+
+    if (!std::holds_alternative<Instruction *>(check_shr_zero->inputs[0].data) ||
+        std::get<Instruction *>(check_shr_zero->inputs[0].data) != arg0)
+        return false;
+
+    if (shr_huge->opcode != Const::opcode || std::get<int>(shr_huge->inputs[0].data) != 0)
+        return false;
+
+    return true;
+}
+
 int main() {
     test_construct(true);
     if (!test_dom_tree1()) {
@@ -560,6 +622,11 @@ int main() {
         std::cout << "test_constant_folding_negative FAILED :(\n";
         return 1;
     }
+    std::cout << "const fold tests passed!\n";
 
-    std::cout << "optimizer tests passed!\n";
+    if (!test_peepholes()) {
+        std::cout << "test_peepholes FAILED :(\n";
+        return 1;
+    }
+    std::cout << "peephole tests passed!\n";
 }
