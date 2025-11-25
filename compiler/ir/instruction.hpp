@@ -19,21 +19,36 @@ struct Instruction;
 typedef uint32_t opcode_t;
 const opcode_t PHI_OPCODE = 'PHI';
 
-template <opcode_t opcode_, Types::Type type_, int flags_ = 0>
-struct InstructionTraits {
+template <opcode_t opcode_, int flags_ = 0>
+struct OpTrait {
     static const opcode_t opcode = opcode_;
-    static const Types::Type type = type_;
     constexpr static const std::bitset<1> flags = flags_;
 };
 
-typedef InstructionTraits<'ADD', Types::INT64_T> Add;
-typedef InstructionTraits<PHI_OPCODE, Types::INT64_T> Phi;
-typedef InstructionTraits<'EQ', Types::BOOL_T> Eq;
-typedef InstructionTraits<'SUB', Types::INT64_T> Sub;
-typedef InstructionTraits<'MUL', Types::INT64_T> Mul;
-typedef InstructionTraits<'RET', Types::VOID_T> Ret;
-typedef InstructionTraits<'CNST', Types::INT64_T> Const;
-typedef InstructionTraits<'ARG', Types::INT64_T> GetArg;
+template <typename OpT, Types::Type type_>
+struct TypedInst {
+    static const opcode_t opcode = OpT::opcode;
+    static const Types::Type type = type_;
+    constexpr static const std::bitset<1> flags = OpT::flags;
+};
+
+using Add = OpTrait<'ADD'>;
+using Sub = OpTrait<'SUB'>;
+using Mul = OpTrait<'MUL'>;
+using Phi = OpTrait<PHI_OPCODE>;
+using Eq = OpTrait<'EQ'>;
+using Ret = OpTrait<'RET'>;
+using Const = OpTrait<'CNST'>;
+using GetArg = OpTrait<'ARG'>;
+
+using Add64 = TypedInst<Add, Types::INT64_T>;
+using Sub64 = TypedInst<Sub, Types::INT64_T>;
+using Mul64 = TypedInst<Mul, Types::INT64_T>;
+using Phi64 = TypedInst<Phi, Types::INT64_T>;
+using Const64 = TypedInst<Const, Types::INT64_T>;
+using Arg64 = TypedInst<GetArg, Types::INT64_T>;
+using EqBool = TypedInst<Eq, Types::BOOL_T>;
+using RetVoid = TypedInst<Ret, Types::VOID_T>;
 
 struct User {
     Instruction *inst;
@@ -81,9 +96,8 @@ struct Instruction {
     void add_input(int inp) { inputs.emplace_back(inp); }
 
     Instruction(Instruction *prev_inst, Instruction *next_inst, opcode_t op,
-                Types::Type ty, BasicBlock *parent_bb,
-                std::vector<Input> inputs, std::vector<User> users,
-                std::bitset<1> initial_flags)
+                Types::Type ty, BasicBlock *parent_bb, std::vector<Input> inputs,
+                std::vector<User> users, std::bitset<1> initial_flags)
         : id(counter++),
           prev(prev_inst),
           next(next_inst),

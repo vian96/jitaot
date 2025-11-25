@@ -16,19 +16,20 @@ void test_construct(bool print = true) {
     BasicBlock &entry = graph.basic_blocks[0], &loop = graph.basic_blocks[1],
                &ret = graph.basic_blocks[2];
 
-    auto n = entry.add_<GetArg>({Input(0)});
-    auto int1 = entry.add_<Const>({Input(1)});
+    auto n = entry.add_<Arg64>({Input(0)});
+    auto int1 = entry.add_<Const64>({Input(1)});
     entry.next1 = &loop;
 
     loop.preds.push_back(&entry);
 
-    auto iphi = loop.add_<Phi>({});    // added later
-    auto accphi = loop.add_<Phi>({});  // added later
+    auto iphi = loop.add_<Phi64>({});    // added later
+    auto accphi = loop.add_<Phi64>({});  // added later
 
     Input inp_i{iphi}, inp_acc{accphi}, inp_1{1};
-    auto dec = loop.add_<Sub>({inp_i, inp_1});
-    auto mul = loop.add_<Mul>({inp_acc, inp_i});
-    [[maybe_unused]] auto cmp = loop.add_<Eq>({Input(dec), inp_1});
+
+    auto dec = loop.add_<Sub64>({inp_i, inp_1});
+    auto mul = loop.add_<Mul64>({inp_acc, inp_i});
+    [[maybe_unused]] auto cmp = loop.add_<EqBool>({Input(dec), inp_1});
 
     iphi->add_input(PhiInput(n, &entry));
     iphi->add_input(PhiInput(dec, &loop));
@@ -40,7 +41,7 @@ void test_construct(bool print = true) {
     loop.next2 = &loop;
     loop.preds.push_back(&loop);
     ret.preds.push_back(&loop);
-    ret.add_<Ret>({mul});
+    ret.add_<RetVoid>({mul});
 
     compute_immediate_dominators(&graph);  // just to check that it somehow works
 

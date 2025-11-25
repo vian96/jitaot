@@ -62,9 +62,14 @@ struct BasicBlock {
         return newinst;
     }
 
-    template <typename InstrTraits>
+    template <typename TypedInstr>
     Instruction *add_(std::vector<Input> inputs) {
-        return add_instruction(InstrTraits::opcode, InstrTraits::type, inputs);
+        return add_instruction(TypedInstr::opcode, TypedInstr::type, inputs);
+    }
+
+    template <typename OpTrait>
+    Instruction *add_(Types::Type type, std::vector<Input> inputs) {
+        return add_instruction(OpTrait::opcode, type, inputs);
     }
 
     void dump() {
