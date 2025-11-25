@@ -5,6 +5,7 @@
 #include "graph.hpp"
 #include "instruction.hpp"
 #include "loop_analyser.hpp"
+#include "optimizer.hpp"
 #include "types.hpp"
 
 using namespace Compiler::IR;
@@ -406,6 +407,105 @@ bool test_loop_analyzer5() {
     return la.is_equal(expected_la, true);
 }
 
+bool test_constant_folding() {
+    Graph graph{1};
+    BasicBlock &bb = graph.basic_blocks[0];
+
+    // immediate values: 10 - 3 = 7
+    auto sub_imm = bb.add_<Sub64>({Input(10), Input(3)});
+
+    // instruction constants: 20 & 12 = 4 (10100 & 01100 = 00100)
+    auto c20 = bb.add_<Const64>({Input(20)});
+    auto c12 = bb.add_<Const64>({Input(12)});
+    auto and_inst = bb.add_<And64>({Input(c20), Input(c12)});
+
+    // simple chained folding: (10 - 3) >> 1 => 7 >> 1 = 3
+    auto shr_inst = bb.add_<Shr64>({Input(sub_imm), Input(1)});
+
+    Optimizer::constant_folding(&graph);
+
+    if (sub_imm->opcode != Const::opcode) return false;
+    if (std::get<int>(sub_imm->inputs[0].data) != 7) return false;
+    if (and_inst->opcode != Const::opcode) return false;
+    if (std::get<int>(and_inst->inputs[0].data) != 4) return false;
+    if (shr_inst->opcode != Const::opcode) return false;
+    if (std::get<int>(shr_inst->inputs[0].data) != 3) return false;
+
+    return true;
+}
+
+bool test_constant_folding_deep_chain() {
+    Graph graph{1};
+    BasicBlock &bb = graph.basic_blocks[0];
+
+    // v0 = 100
+    // v1 = v0 - 20  (80)
+    // v2 = v1 >> 3  (80 / 8 = 10)
+    // v3 = v2 & 7   (10 & 7 = 1010 & 0111 = 0010 = 2)
+    // v4 = v3 - v2  (2 - 10 = -8)
+
+    auto v0 = bb.add_<Const64>({Input(100)});
+    auto v1 = bb.add_<Sub64>({Input(v0), Input(20)});
+    auto v2 = bb.add_<Shr64>({Input(v1), Input(3)});
+    auto v3 = bb.add_<And64>({Input(v2), Input(7)});
+    auto v4 = bb.add_<Sub64>({Input(v3), Input(v2)});
+
+    Optimizer::constant_folding(&graph);
+
+    if (v4->opcode != Const::opcode) return false;
+    if (std::get<int>(v4->inputs[0].data) != -8) return false;
+
+    // intermidiate ones should also be optimized
+    if (v1->opcode != Const::opcode || v2->opcode != Const::opcode ||
+        v3->opcode != Const::opcode)
+        return false;
+
+    return true;
+}
+
+bool test_constant_folding_control_flow() {
+    // BB0 (defines C1, C2) -> BB1 (uses C1, C2) -> BB2 (uses BB1 res)
+    Graph graph{3};
+    BasicBlock &bb0 = graph.basic_blocks[0];
+    BasicBlock &bb1 = graph.basic_blocks[1];
+    BasicBlock &bb2 = graph.basic_blocks[2];
+
+    bb0.add_next1(&bb1);
+    bb1.add_next1(&bb2);
+
+    auto c100 = bb0.add_<Const64>({Input(100)});
+    auto c50 = bb0.add_<Const64>({Input(50)});
+    auto sub = bb1.add_<Sub64>({Input(c100), Input(c50)});
+    auto res = bb2.add_<And64>({Input(sub), Input(32)});
+
+    Optimizer::constant_folding(&graph);
+
+    if (res->opcode != Const::opcode) return false;
+    if (std::get<int>(res->inputs[0].data) != 32) return false;
+
+    return true;
+}
+
+bool test_constant_folding_negative() {
+    Graph graph{1};
+    BasicBlock &bb = graph.basic_blocks[0];
+
+    auto arg0 = bb.add_<Arg64>({Input(0)});
+    auto c10 = bb.add_<Const64>({Input(10)});
+
+    auto sub1 = bb.add_<Sub64>({Input(arg0), Input(c10)});
+    auto sub2 = bb.add_<Sub64>({Input(c10), Input(arg0)});
+    auto and1 = bb.add_<And64>({Input(arg0), Input(arg0)});
+
+    Optimizer::constant_folding(&graph);
+
+    if (sub1->opcode == Const::opcode) return false;
+    if (sub2->opcode == Const::opcode) return false;
+    if (and1->opcode == Const::opcode) return false;
+
+    return true;
+}
+
 int main() {
     test_construct(true);
     if (!test_dom_tree1()) {
@@ -443,4 +543,23 @@ int main() {
         return 1;
     }
     std::cout << "all loop_analyzer tests passed!\n";
+
+    if (!test_constant_folding()) {
+        std::cout << "test_constant_folding FAILED :(\n";
+        return 1;
+    }
+    if (!test_constant_folding_deep_chain()) {
+        std::cout << "test_constant_folding_deep_chain FAILED :(\n";
+        return 1;
+    }
+    if (!test_constant_folding_control_flow()) {
+        std::cout << "test_constant_folding_control_flow FAILED :(\n";
+        return 1;
+    }
+    if (!test_constant_folding_negative()) {
+        std::cout << "test_constant_folding_negative FAILED :(\n";
+        return 1;
+    }
+
+    std::cout << "optimizer tests passed!\n";
 }

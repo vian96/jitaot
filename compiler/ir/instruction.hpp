@@ -35,6 +35,8 @@ struct TypedInst {
 using Add = OpTrait<'ADD'>;
 using Sub = OpTrait<'SUB'>;
 using Mul = OpTrait<'MUL'>;
+using And = OpTrait<'AND'>;
+using Shr = OpTrait<'SHR'>;
 using Phi = OpTrait<PHI_OPCODE>;
 using Eq = OpTrait<'EQ'>;
 using Ret = OpTrait<'RET'>;
@@ -44,6 +46,8 @@ using GetArg = OpTrait<'ARG'>;
 using Add64 = TypedInst<Add, Types::INT64_T>;
 using Sub64 = TypedInst<Sub, Types::INT64_T>;
 using Mul64 = TypedInst<Mul, Types::INT64_T>;
+using And64 = TypedInst<And, Types::INT64_T>;
+using Shr64 = TypedInst<Shr, Types::INT64_T>;
 using Phi64 = TypedInst<Phi, Types::INT64_T>;
 using Const64 = TypedInst<Const, Types::INT64_T>;
 using Arg64 = TypedInst<GetArg, Types::INT64_T>;

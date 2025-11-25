@@ -24,6 +24,19 @@ inline void post_order_DFS(BasicBlock *block, std::vector<BasicBlock *> &post_or
     post_order.push_back(block);
 }
 
+inline std::vector<BasicBlock *> get_reverse_post_order(Graph *graph) {
+    if (!graph || !graph->first) return {};
+    
+    std::vector<BasicBlock *> post_order_blocks;
+    std::vector<bool> visited(graph->basic_blocks.size(), false);
+    int post_order_counter = 0;
+    
+    post_order_DFS(graph->first, post_order_blocks, visited, post_order_counter);
+    
+    std::reverse(post_order_blocks.begin(), post_order_blocks.end());
+    return post_order_blocks;
+}
+
 inline BasicBlock *find_common_idom(BasicBlock *b1, BasicBlock *b2) {
     // finds first common idom ("intersects" preds). all higher idoms will be the same
     BasicBlock *finger1 = b1;
@@ -44,13 +57,7 @@ inline void compute_immediate_dominators(Graph *graph) {
     // lecture and it works on test examples
     if (!graph || !graph->first) return;
 
-    std::vector<BasicBlock *> post_order_blocks;
-    std::vector<bool> visited(graph->basic_blocks.size(), false);
-    int post_order_counter = 0;
-    post_order_DFS(graph->first, post_order_blocks, visited, post_order_counter);
-
-    std::vector<BasicBlock *> reverse_post_order = post_order_blocks;
-    std::reverse(reverse_post_order.begin(), reverse_post_order.end());
+    std::vector<BasicBlock *> reverse_post_order = get_reverse_post_order(graph);
 
     for (auto &block : graph->basic_blocks) block.idom = nullptr;
     graph->first->idom = graph->first;
