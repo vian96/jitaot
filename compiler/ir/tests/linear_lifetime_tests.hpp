@@ -10,6 +10,37 @@
 
 using namespace Compiler::IR;
 
+inline void verify_monolithic_coverage(const LiveInterval *interval, int region_start,
+                                       int region_end) {
+    assert(interval != nullptr && "Interval cannot be null");
+
+    int intersection_count = 0;
+    bool covers_completely = false;
+
+    for (const auto &r : interval->ranges) {
+        if (r.start < region_end && r.end > region_start) {
+            intersection_count++;
+            if (r.start <= region_start && r.end >= region_end) covers_completely = true;
+        }
+    }
+
+    assert(intersection_count == 1 &&
+           "LSRA Failure: Interval is fragmented! Multiple ranges intersect this "
+           "loop/region.");
+    assert(
+        covers_completely &&
+        "LSRA Failure: The intersecting range does not completely span the loop/region!");
+}
+
+inline bool is_live_at(const LiveInterval *interval, int pos) {
+    if (!interval || interval->ranges.empty()) return false;
+    for (const auto &range : interval->ranges) {
+        if (pos >= range.start && pos < range.end) return true;
+        if (pos < range.start) break;
+    }
+    return false;
+}
+
 inline bool is_in_lifetime_hole(const LiveInterval *interval, int pos) {
     if (!interval || interval->ranges.empty()) return false;
 
@@ -63,24 +94,31 @@ inline void test_if_else_graph() {
 
     std::cout << "linear tests are ok\n";
 
-    LiveInterval *interval_b1 = liveness.get_live_interval(v_b1_use);
-    LiveInterval *interval_b2 = liveness.get_live_interval(v_b2_use);
+    LiveInterval *interval_b1_use = liveness.get_live_interval(v_b1_use);
+    LiveInterval *interval_b2_use = liveness.get_live_interval(v_b2_use);
     LiveInterval *interval_both = liveness.get_live_interval(v_both);
 
-    assert(interval_b1 && interval_b2 && interval_both);
+    assert(interval_b1_use && interval_b2_use && interval_both);
 
     // depending on order, one of variables has to be in a hole of another bb
     if (b1->linear_from < b2->linear_from) {
-        assert(is_in_lifetime_hole(interval_b2, b1->linear_from) == true);
-        assert(is_in_lifetime_hole(interval_b1, b2->linear_from) == false);
+        assert(is_in_lifetime_hole(interval_b2_use, b1->linear_from) == true);
+        assert(is_in_lifetime_hole(interval_b1_use, b2->linear_from) == false);
     } else {
-        assert(is_in_lifetime_hole(interval_b1, b2->linear_from) == true);
-        assert(is_in_lifetime_hole(interval_b2, b1->linear_from) == false);
+        assert(is_in_lifetime_hole(interval_b1_use, b2->linear_from) == true);
+        assert(is_in_lifetime_hole(interval_b2_use, b1->linear_from) == false);
     }
 
     // used in both so no holes
     assert(is_in_lifetime_hole(interval_both, b1->linear_from) == false);
     assert(is_in_lifetime_hole(interval_both, b2->linear_from) == false);
+
+    LiveInterval *interval_b1 = liveness.get_live_interval(v_b1);
+    LiveInterval *interval_b2 = liveness.get_live_interval(v_b2);
+    assert(is_live_at(interval_b1, b1->linear_to - 1) &&
+           "Phi input not live at end of pred b1");
+    assert(is_live_at(interval_b2, b2->linear_to - 1) &&
+           "Phi input not live at end of pred b2");
 
     std::cout << "lifetime tests are ok\n\n";
 }
@@ -124,6 +162,17 @@ inline void test_simple_loop_graph() {
     // check that returned value is not a hole so it is not overwritten in a loop
     assert(is_in_lifetime_hole(inv_interval, b2->linear_from) == false);
     assert(is_in_lifetime_hole(inv_interval, v_latch->linear_num) == false);
+
+    LiveInterval *loop_interval = liveness.get_live_interval(v_loop);
+    // it is not used in next iteration so should not be alive
+    assert(!is_live_at(loop_interval, b2->linear_to - 1) &&
+           "Loop variable should be dead before backedge");
+
+    // should be alive before its use
+    assert(is_live_at(loop_interval, v_latch->linear_num - 1) &&
+           "Loop variable should be live at its use in B2");
+
+    verify_monolithic_coverage(inv_interval, b1->linear_from, b2->linear_to);
 
     std::cout << "liveness tests are ok\n\n";
 }
@@ -200,6 +249,10 @@ inline void test_complex_nested_graph() {
         assert(is_in_lifetime_hole(inner_def_T_int, b4->linear_from) == true);
         assert(is_in_lifetime_hole(inner_def_F_int, b3->linear_from) == false);
     }
+
+    int inner_header_start = b2->linear_from;
+    int inner_latch_end = b5->linear_to;
+    verify_monolithic_coverage(outer_inv_int, inner_header_start, inner_latch_end);
 
     std::cout << "lifetime checks are ok\n\n";
 }

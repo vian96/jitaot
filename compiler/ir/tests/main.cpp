@@ -582,9 +582,9 @@ bool test_peephole_swapped_args() {
     auto and_minus_1_first = bb.add_<And64>({Input(c_minus_1), Input(arg0)});
     auto shr_zero_first = bb.add_<Shr64>({Input(c0), Input(arg0)});
 
-    auto check1 = bb.add_<Sub64>({Input(and_zero_first), Input(1)});
+    auto _check1 = bb.add_<Sub64>({Input(and_zero_first), Input(1)});
     auto check2 = bb.add_<Sub64>({Input(and_minus_1_first), Input(1)});
-    auto check3 = bb.add_<Sub64>({Input(shr_zero_first), Input(1)});
+    auto _check3 = bb.add_<Sub64>({Input(shr_zero_first), Input(1)});
 
     Optimizer::peephole_pass(&graph);
 
