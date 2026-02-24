@@ -30,6 +30,9 @@ struct BasicBlock {
     BasicBlock *idom = nullptr;
     int post_order_number = -1;
 
+    int linear_from = -1;
+    int linear_to = -1;
+
     BasicBlock() {}
 
     void add_next1(BasicBlock *other) {

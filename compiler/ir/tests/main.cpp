@@ -1,5 +1,7 @@
 #include <unordered_map>
 
+#include "linear_lifetime_tests.hpp"
+
 #include "basic_block.hpp"
 #include "doms.hpp"
 #include "graph.hpp"
@@ -701,4 +703,6 @@ int main() {
         return 1;
     }
     std::cout << "peephole tests passed!\n";
+
+    run_linear_lifetime_tests();
 }

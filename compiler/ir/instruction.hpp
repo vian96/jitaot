@@ -75,6 +75,8 @@ struct Instruction {
     inline static std::atomic<int> counter = 0;
     const int id;
 
+    int linear_num = -1;
+
     Instruction *prev = nullptr;
     Instruction *next = nullptr;
 
