@@ -16,6 +16,22 @@ namespace IR {
 struct BasicBlock;
 struct Instruction;
 
+enum class LocationType { UNASSIGNED, REGISTER, STACK };
+
+struct Location {
+    LocationType type = LocationType::UNASSIGNED;
+    int value = -1;  // either the Register ID or Stack Slot ID
+
+    void dump() const {
+        if (type == LocationType::REGISTER)
+            std::cout << "Reg(" << value << ")";
+        else if (type == LocationType::STACK)
+            std::cout << "Stack(" << value << ")";
+        else
+            std::cout << "Unassigned";
+    }
+};
+
 typedef uint32_t opcode_t;
 const opcode_t PHI_OPCODE = 'PHI';
 
@@ -43,6 +59,10 @@ using Ret = OpTrait<'RET'>;
 using Const = OpTrait<'CNST'>;
 using GetArg = OpTrait<'ARG'>;
 
+using Spill = OpTrait<'SPIL'>;
+using Fill = OpTrait<'FILL'>;
+using Move = OpTrait<'MOVE'>;
+
 using Add64 = TypedInst<Add, Types::INT64_T>;
 using Sub64 = TypedInst<Sub, Types::INT64_T>;
 using Mul64 = TypedInst<Mul, Types::INT64_T>;
@@ -53,6 +73,9 @@ using Const64 = TypedInst<Const, Types::INT64_T>;
 using Arg64 = TypedInst<GetArg, Types::INT64_T>;
 using EqBool = TypedInst<Eq, Types::BOOL_T>;
 using RetVoid = TypedInst<Ret, Types::VOID_T>;
+
+using SpillVoid = TypedInst<Spill, Types::VOID_T>;
+using Fill64 = TypedInst<Fill, Types::INT64_T>;
 
 struct User {
     Instruction *inst;
@@ -88,6 +111,8 @@ struct Instruction {
     std::vector<User> users;
 
     std::bitset<1> flags = 0;  // throwable, ...
+
+    Location loc;
 
     void add_input(PhiInput inp) {
         inputs.emplace_back(inp);
@@ -125,6 +150,8 @@ struct Instruction {
         for (auto &i : inputs) i.dump();
         std::cout << "users: ";
         for (auto &i : users) std::cout << " %" << i.inst->id;
+        std::cout << ' ';
+        loc.dump();
         std::cout << std::endl;
     }
 };

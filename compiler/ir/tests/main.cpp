@@ -1,6 +1,7 @@
 #include <unordered_map>
 
 #include "linear_lifetime_tests.hpp"
+#include "regalloc.hpp"
 
 #include "basic_block.hpp"
 #include "doms.hpp"
@@ -705,4 +706,5 @@ int main() {
     std::cout << "peephole tests passed!\n";
 
     run_linear_lifetime_tests();
+    run_regalloc_unit_tests();
 }

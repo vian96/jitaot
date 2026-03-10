@@ -64,6 +64,12 @@ class LivenessAnalyzer {
    public:
     std::unordered_map<Instruction *, LiveInterval> intervals;
 
+    LivenessAnalyzer(Graph &g) {
+        LoopAnalyzer la(&g);
+        LinearOrderBuilder linear(&g, &la);
+        build(linear.linear_order, la);
+    }
+
     LivenessAnalyzer(const LinearOrderBuilder &linear_order_builder,
                      const LoopAnalyzer &loop_analyzer) {
         build(linear_order_builder.linear_order, loop_analyzer);

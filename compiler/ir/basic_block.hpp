@@ -45,21 +45,19 @@ struct BasicBlock {
     }
 
     Instruction *add_instruction(opcode_t opcode, Types::Type type,
-                                 std::vector<Input> inputs,
-                                 std::bitset<1> flags = 0) {
-        Instruction *newinst = new Instruction(last, nullptr, opcode, type,
-                                               this, inputs, {}, flags);
+                                 std::vector<Input> inputs, std::bitset<1> flags = 0) {
+        Instruction *newinst =
+            new Instruction(last, nullptr, opcode, type, this, inputs, {}, flags);
 
         for (auto &i : inputs)
             if (std::holds_alternative<Instruction *>(i.data))
                 std::get<Instruction *>(i.data)->users.push_back(newinst);
 
         if (last) last->next = newinst;
-        if (!last) {
-            if (opcode == PHI_OPCODE)
-                first_phi = newinst;
-            else
-                first_not_phi = newinst;
+        if (opcode == PHI_OPCODE) {
+            if (!first_phi) first_phi = newinst;
+        } else {
+            if (!first_not_phi) first_not_phi = newinst;
         }
         last = newinst;
         return newinst;
@@ -75,7 +73,7 @@ struct BasicBlock {
         return add_instruction(OpTrait::opcode, type, inputs);
     }
 
-    void dump() {
+    void dump() const {
         std::cout << "basic block %" << id << ": \n";
         Instruction *inst = first_phi ? first_phi : first_not_phi;
         while (inst != nullptr) {
@@ -86,8 +84,10 @@ struct BasicBlock {
         if (next2) std::cout << "next2: " << next2->id << ' ';
         std::cout << "\npreds:";
         for (auto &i : preds) std::cout << " %" << i->id;
-        if (idom) std::cout << "\nidom: " << idom->id;
-        else std::cout << "\nno idom:(";
+        if (idom)
+            std::cout << "\nidom: " << idom->id;
+        else
+            std::cout << "\nno idom:(";
         std::cout << "\n\n\n";
     }
 };

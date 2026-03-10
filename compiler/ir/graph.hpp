@@ -2,6 +2,7 @@
 #define COMPILER_IR_GRAPH
 
 #include <iostream>
+#include <deque>
 #include <vector>
 
 #include "basic_block.hpp"
@@ -16,12 +17,12 @@ struct Graph {
     inline static int counter = 0;
 
     const int id;
-    std::vector<Types::Type> args;
-    std::vector<BasicBlock> basic_blocks;
+    std::deque<Types::Type> args;
+    std::deque<BasicBlock> basic_blocks;
     BasicBlock *first = nullptr;
 
     Graph(int bbnum = 1, std::vector<Types::Type> args_ = {})
-        : id(counter++), args(args_), basic_blocks(bbnum), first(&basic_blocks[0]) {
+        : id(counter++), args(args_.begin(), args_.end()), basic_blocks(bbnum), first(&basic_blocks[0]) {
         for (size_t i = 0; i < basic_blocks.size(); i++) basic_blocks[i].id = i;
     }
 
