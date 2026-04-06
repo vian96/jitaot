@@ -1,6 +1,7 @@
 #include <unordered_map>
 
 #include "linear_lifetime_tests.hpp"
+#include "inliner_test.hpp"
 #include "regalloc.hpp"
 
 #include "basic_block.hpp"
@@ -707,4 +708,5 @@ int main() {
 
     run_linear_lifetime_tests();
     run_regalloc_unit_tests();
+    test_inliner();
 }

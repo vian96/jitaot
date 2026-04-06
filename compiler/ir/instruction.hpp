@@ -63,6 +63,9 @@ using Spill = OpTrait<'SPIL'>;
 using Fill = OpTrait<'FILL'>;
 using Move = OpTrait<'MOVE'>;
 
+using Call = OpTrait<'CALL'>;
+using Call64 = TypedInst<Call, Types::INT64_T>;
+
 using Add64 = TypedInst<Add, Types::INT64_T>;
 using Sub64 = TypedInst<Sub, Types::INT64_T>;
 using Mul64 = TypedInst<Mul, Types::INT64_T>;
@@ -73,6 +76,7 @@ using Const64 = TypedInst<Const, Types::INT64_T>;
 using Arg64 = TypedInst<GetArg, Types::INT64_T>;
 using EqBool = TypedInst<Eq, Types::BOOL_T>;
 using RetVoid = TypedInst<Ret, Types::VOID_T>;
+using Ret64 = TypedInst<Ret, Types::INT64_T>;
 
 using SpillVoid = TypedInst<Spill, Types::VOID_T>;
 using Fill64 = TypedInst<Fill, Types::INT64_T>;
