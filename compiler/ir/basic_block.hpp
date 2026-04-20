@@ -1,6 +1,7 @@
 #ifndef COMPILER_IR_BASICBLOCK
 #define COMPILER_IR_BASICBLOCK
 
+#include <algorithm>
 #include <bitset>
 #include <variant>
 #include <vector>
@@ -45,7 +46,7 @@ struct BasicBlock {
     }
 
     Instruction *add_instruction(opcode_t opcode, Types::Type type,
-                                 std::vector<Input> inputs, std::bitset<1> flags = 0) {
+                                 std::vector<Input> inputs, std::bitset<8> flags = 0) {
         Instruction *newinst =
             new Instruction(last, nullptr, opcode, type, this, inputs, {}, flags);
 
@@ -63,14 +64,40 @@ struct BasicBlock {
         return newinst;
     }
 
+    void remove_instruction(Instruction *inst) {
+        if (inst->prev) inst->prev->next = inst->next;
+        if (inst->next) inst->next->prev = inst->prev;
+
+        if (first_phi == inst)
+            first_phi =
+                (inst->next && inst->next->opcode == PHI_OPCODE) ? inst->next : nullptr;
+        if (first_not_phi == inst) first_not_phi = inst->next;
+        if (last == inst) last = inst->prev;
+
+        // remove from inputs' users
+        for (auto &inp : inst->inputs) {
+            if (std::holds_alternative<Instruction *>(inp.data)) {
+                auto &users = std::get<Instruction *>(inp.data)->users;
+                users.erase(std::remove_if(users.begin(), users.end(),
+                                           [inst](User &u) { return u.inst == inst; }),
+                            users.end());
+            } else if (std::holds_alternative<PhiInput>(inp.data)) {
+                auto &users = std::get<PhiInput>(inp.data).first->users;
+                users.erase(std::remove_if(users.begin(), users.end(),
+                                           [inst](User &u) { return u.inst == inst; }),
+                            users.end());
+            }
+        }
+    }
+
     template <typename TypedInstr>
     Instruction *add_(std::vector<Input> inputs) {
-        return add_instruction(TypedInstr::opcode, TypedInstr::type, inputs);
+        return add_instruction(TypedInstr::opcode, TypedInstr::type, inputs, TypedInstr::flags);
     }
 
     template <typename OpTrait>
     Instruction *add_(Types::Type type, std::vector<Input> inputs) {
-        return add_instruction(OpTrait::opcode, type, inputs);
+        return add_instruction(OpTrait::opcode, type, inputs, OpTrait::flags);
     }
 
     void dump() const {

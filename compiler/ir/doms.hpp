@@ -26,13 +26,13 @@ inline void post_order_DFS(BasicBlock *block, std::vector<BasicBlock *> &post_or
 
 inline std::vector<BasicBlock *> get_reverse_post_order(Graph *graph) {
     if (!graph || !graph->first) return {};
-    
+
     std::vector<BasicBlock *> post_order_blocks;
     std::vector<bool> visited(graph->basic_blocks.size(), false);
     int post_order_counter = 0;
-    
+
     post_order_DFS(graph->first, post_order_blocks, visited, post_order_counter);
-    
+
     std::reverse(post_order_blocks.begin(), post_order_blocks.end());
     return post_order_blocks;
 }
@@ -162,6 +162,17 @@ struct DominatorTree {
         return true;
     }
 };
+
+inline bool dominates(BasicBlock *dominator, BasicBlock *dominated) {
+    if (!dominator || !dominated) return false;
+    BasicBlock *current = dominated;
+    while (current != dominator) {
+        if (current->idom == current || current->idom == nullptr) 
+            return false;
+        current = current->idom;
+    }
+    return true;
+}
 
 }  // namespace IR
 }  // namespace Compiler

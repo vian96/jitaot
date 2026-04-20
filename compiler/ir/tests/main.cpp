@@ -1,15 +1,15 @@
 #include <unordered_map>
 
-#include "linear_lifetime_tests.hpp"
-#include "inliner_test.hpp"
-#include "regalloc.hpp"
-
 #include "basic_block.hpp"
+#include "check_elimintaion_tests.hpp"
 #include "doms.hpp"
 #include "graph.hpp"
+#include "inliner_test.hpp"
 #include "instruction.hpp"
+#include "linear_lifetime_tests.hpp"
 #include "loop_analyser.hpp"
 #include "optimizer.hpp"
+#include "regalloc.hpp"
 #include "types.hpp"
 
 using namespace Compiler::IR;
@@ -709,4 +709,5 @@ int main() {
     run_linear_lifetime_tests();
     run_regalloc_unit_tests();
     test_inliner();
+    run_check_elimination_tests();
 }

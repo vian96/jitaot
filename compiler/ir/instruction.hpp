@@ -16,6 +16,8 @@ namespace IR {
 struct BasicBlock;
 struct Instruction;
 
+constexpr int IS_CHECK_FLAG = 1;
+
 enum class LocationType { UNASSIGNED, REGISTER, STACK };
 
 struct Location {
@@ -38,14 +40,14 @@ const opcode_t PHI_OPCODE = 'PHI';
 template <opcode_t opcode_, int flags_ = 0>
 struct OpTrait {
     static const opcode_t opcode = opcode_;
-    constexpr static const std::bitset<1> flags = flags_;
+    constexpr static const std::bitset<8> flags = flags_;
 };
 
 template <typename OpT, Types::Type type_>
 struct TypedInst {
     static const opcode_t opcode = OpT::opcode;
     static const Types::Type type = type_;
-    constexpr static const std::bitset<1> flags = OpT::flags;
+    constexpr static const std::bitset<8> flags = OpT::flags;
 };
 
 using Add = OpTrait<'ADD'>;
@@ -81,6 +83,15 @@ using Ret64 = TypedInst<Ret, Types::INT64_T>;
 using SpillVoid = TypedInst<Spill, Types::VOID_T>;
 using Fill64 = TypedInst<Fill, Types::INT64_T>;
 
+// check instructions
+using ZC = OpTrait<'ZCHK', (1 << IS_CHECK_FLAG)>;
+using NC = OpTrait<'NCHK', (1 << IS_CHECK_FLAG)>;
+using BC = OpTrait<'BCHK', (1 << IS_CHECK_FLAG)>;
+
+using ZeroCheck = TypedInst<ZC, Types::VOID_T>;
+using NullCheck = TypedInst<NC, Types::VOID_T>;
+using BoundsCheck = TypedInst<BC, Types::VOID_T>;
+
 struct User {
     Instruction *inst;
     // other info
@@ -96,6 +107,8 @@ struct Input {
     Input(Instruction *inst_) : data(inst_) {}
     Input(int intval) : data(intval) {}
     Input(PhiInput phi_inp) : data(phi_inp) {}
+
+    bool operator==(const Input &other) const { return data == other.data; }
 };
 
 struct Instruction {
@@ -114,7 +127,7 @@ struct Instruction {
     std::vector<Input> inputs;
     std::vector<User> users;
 
-    std::bitset<1> flags = 0;  // throwable, ...
+    std::bitset<8> flags = 0;  // throwable, is_check, ...
 
     Location loc;
 
@@ -132,7 +145,7 @@ struct Instruction {
 
     Instruction(Instruction *prev_inst, Instruction *next_inst, opcode_t op,
                 Types::Type ty, BasicBlock *parent_bb, std::vector<Input> inputs,
-                std::vector<User> users, std::bitset<1> initial_flags)
+                std::vector<User> users, std::bitset<8> initial_flags)
         : id(counter++),
           prev(prev_inst),
           next(next_inst),
@@ -142,6 +155,15 @@ struct Instruction {
           inputs(inputs),
           users(users),
           flags(initial_flags) {}
+
+    bool operator==(const Instruction &other) const {
+        if (opcode != other.opcode || type != other.type || flags != other.flags)
+            return false;
+        if (inputs.size() != other.inputs.size()) return false;
+        for (size_t i = 0; i < inputs.size(); ++i)
+            if (!(inputs[i] == other.inputs[i])) return false;
+        return true;
+    }
 
     void dump() {
         std::cout << "instruction %" << id << ": ";
